@@ -1,3 +1,4 @@
+from unicodedata import name
 import pandas as pd
 
 from sklearn.feature_extraction import DictVectorizer
@@ -13,12 +14,7 @@ import pickle
 
 from prefect.deployments import DeploymentSpec
 from prefect.orion.schemas.schedules import CronSchedule
-
-DeploymentSpec(
-    name="cron-schedule-deployment",
-    flow_location="/path/to/flow.py",
-    schedule=CronSchedule(cron="0 9 15 * *", timezone="America/New_York"),
-)
+from prefect.flow_runners import SubprocessFlowRunner
 
 
 @task
@@ -114,13 +110,19 @@ def main(date=None):
     lr, dv = train_model(df_train_processed, categorical).result()
 
     # save the model and vectorizer
-    with open(f"model-{date}.pkl", "wb") as f_out:
+    with open(f"model-{date}.bin", "wb") as f_out:
         pickle.dump(lr, f_out)
 
-    with open(f"dv-{date}.pkl", "wb") as f_out:
+    with open(f"dv-{date}.b", "wb") as f_out:
         pickle.dump(dv, f_out)
 
     run_model(df_val_processed, categorical, dv, lr)
 
 
-main(date="2021-08-15")
+DeploymentSpec(
+    name="model_deployment",
+    flow=main,
+    schedule=CronSchedule(cron="0 9 15 * *", timezone="America/New_York"),
+    flow_runner=SubprocessFlowRunner()
+)
+
